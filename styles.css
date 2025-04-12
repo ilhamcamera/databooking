@@ -115,71 +115,89 @@ h1 {
 }
 
 .table-container {
-    overflow-x: auto;
+    overflow: auto;
     max-height: 70vh;
     box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     border-radius: 8px;
     margin-bottom: 20px;
     position: relative;
     background-color: white;
+    -webkit-overflow-scrolling: touch;
 }
 
 .booking-matrix {
-    width: 100%;
     border-collapse: separate;
     border-spacing: 0;
-    margin-bottom: 0;
-    table-layout: fixed;
-    background-color: white;
+    border: 1px solid #e0e0e0; /* Border tabel utama lebih tipis */
+}
+.booking-matrix th, 
+.booking-matrix td {
+    border: 0.5px solid #e0e0e0; /* Ubah ketebalan border sel */
+    padding: 4px;
+}
+/* Untuk header tetap gunakan border yang sedikit lebih tebal */
+.booking-matrix thead th {
+    border: 1px solid #dee2e6;
 }
 
-.booking-matrix th, .booking-matrix td {
-    border: 1px solid var(--border-color);
-    text-align: center;
-    vertical-align: middle;
-}
-
-.booking-matrix th {
-    background-color: var(--primary-color);
-    color: var(--text-light);
-    font-weight: 500;
+/* HEADER TANGGAL - FIX STICKY */
+.booking-matrix thead th {
+    position: -webkit-sticky; /* Untuk Safari */
     position: sticky;
     top: 0;
-    z-index: 10;
-    padding: 12px 8px;
-    font-size: 0.85rem;
+    z-index: 25;
+    background-color: var(--primary-color);
+    color: white;
+    border: 1px solid var(--border-color);
 }
 
+/* CORNER CELL (Pojok kiri atas) */
+.booking-matrix thead th:first-child {
+    position: -webkit-sticky;
+    position: sticky;
+    top: 0;
+    left: 0;
+    z-index: 40; /* Z-index tertinggi */
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+}
+
+/* HEADER UNIT (NAMA BARANG) - FIX STICKY */
 .unit-header {
     min-width: 180px;
     width: 180px;
     max-width: 180px;
     white-space: normal;
     word-wrap: break-word;
-    position: sticky;
-    left: 0;
-    z-index: 20;
     background-color: var(--primary-color) !important;
     color: white;
     padding: 12px 15px !important;
+    position: -webkit-sticky;
+    position: sticky;
+    left: 0;
+    z-index: 30;
+    box-shadow: 2px 0 5px rgba(0,0,0,0.1);
 }
 
+/* CELL UNIT (NAMA BARANG DI KOLOM PERTAMA) - FIX STICKY */
 .unit-cell {
     min-width: 180px;
     width: 180px;
     max-width: 180px;
     white-space: normal;
     word-wrap: break-word;
-    position: sticky;
-    left: 0;
-    z-index: 5;
     background-color: white;
     color: var(--primary-color);
     font-weight: 500;
     padding: 10px 15px !important;
     border-right: 2px solid var(--border-color);
+    position: -webkit-sticky;
+    position: sticky;
+    left: 0;
+    z-index: 20;
+    box-shadow: 2px 0 5px rgba(0,0,0,0.1);
 }
 
+/* CELL TANGGAL */
 .date-cell {
     min-width: 60px;
     width: 60px;
@@ -188,7 +206,6 @@ h1 {
     padding: 5px !important;
     position: relative;
     cursor: pointer;
-    transition: all 0.2s ease;
 }
 
 .date-cell:hover {
@@ -403,41 +420,23 @@ h1 {
 
 @media (max-width: 768px) {
     .table-container {
-        display: flex;
-        overflow-x: auto;
         -webkit-overflow-scrolling: touch;
     }
     
-    .booking-matrix {
-        display: inline-block;
-        min-width: auto;
-    }
-    
     .unit-header, .unit-cell {
-        position: static;
-        min-width: 150px;
-        width: 150px;
-        font-size: 0.8rem;
-        white-space: normal;
-        word-break: break-word;
+        min-width: 140px;
+        width: 140px;
+        max-width: 140px;
+        font-size: 0.85rem;
+        padding: 10px 12px !important;
     }
     
     .date-cell {
-        min-width: 50px;
-        width: 50px;
-        height: 50px;
+        min-width: 40px;
+        width: 40px;
+        max-width: 40px;
+        height: 45px;
         font-size: 0.8rem;
-    }
-    
-    .booking-matrix th.date-header {
-        min-width: 50px;
-        width: 50px;
-        font-size: 0.8rem;
-        padding: 8px 4px !important;
-    }
-    
-    .booked {
-        position: relative;
     }
     
     .booked::before {
@@ -448,19 +447,11 @@ h1 {
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
-        font-size: 1rem;
+        font-size: 0.9rem;
     }
     
     .customer-name {
         display: none;
-    }
-    
-    .unit-header, .unit-cell {
-        min-width: 140px;
-        width: 140px;
-        max-width: 140px;
-        font-size: 0.85rem;
-        padding: 10px 12px !important;
     }
     
     .month-year {
@@ -521,10 +512,6 @@ h1 {
         height: 45px;
     }
     
-    .booked::before {
-        font-size: 0.8rem;
-    }
-    
     .month-year {
         font-size: 1.2rem;
         min-width: 160px;
@@ -549,22 +536,88 @@ h1 {
     animation: fadeIn 0.3s ease forwards;
 }
 
-/* Scrollbar styling */
+/* Improved Scrollbar styling */
 ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 12px;
+    height: 12px;
 }
 
 ::-webkit-scrollbar-track {
     background: #f1f1f1;
-    border-radius: 4px;
+    border-radius: 8px;
 }
 
 ::-webkit-scrollbar-thumb {
-    background: #c1c1c1;
-    border-radius: 4px;
+    background: #a8a8a8;
+    border-radius: 8px;
+    border: 2px solid #f1f1f1;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: #a8a8a8;
+    background: #888;
 }
+
+/* Tambahkan ini di bagian CSS Anda */
+
+@media (min-width: 992px) {
+    .table-container {
+        overflow-x: visible;
+        max-height: 75vh;
+    }
+    
+    .booking-matrix {
+        width: 100%;
+        min-width: auto;
+    }
+    
+    /* Hitung lebar total untuk 31 hari */
+    .date-cell {
+        min-width: calc(100% / 31);
+        width: calc(100% / 31);
+        max-width: calc(100% / 31);
+    }
+    
+    /* Unit header tetap fixed */
+    .unit-header, .unit-cell {
+        min-width: 180px;
+        width: 180px;
+        max-width: 180px;
+    }
+    
+    /* Container utama menyesuaikan */
+    .container {
+        max-width: 95%;
+        padding: 20px 15px;
+    }
+    
+    /* Pastikan header tanggal tidak memaksa scroll */
+    .booking-matrix thead th:not(:first-child) {
+        min-width: calc(100% / 31);
+        width: calc(100% / 31);
+    }
+}
+
+/* Untuk bulan dengan 30 hari */
+.days-30 .date-cell {
+    min-width: calc(100% / 30);
+    width: calc(100% / 30);
+    max-width: calc(100% / 30);
+}
+
+.days-30 .booking-matrix thead th:not(:first-child) {
+    min-width: calc(100% / 30);
+    width: calc(100% / 30);
+}
+
+/* Untuk bulan dengan 28 hari (Februari non-kabisat) */
+.days-28 .date-cell {
+    min-width: calc(100% / 28);
+    width: calc(100% / 28);
+    max-width: calc(100% / 28);
+}
+
+.days-28 .booking-matrix thead th:not(:first-child) {
+    min-width: calc(100% / 28);
+    width: calc(100% / 28);
+}
+

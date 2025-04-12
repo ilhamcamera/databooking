@@ -40,7 +40,8 @@ const elements = {
     filterStatus: document.getElementById('filterStatus'),
     filterUnit: document.getElementById('filterUnit'),
     filterCategory: document.getElementById('filterCategory'),
-    searchCustomer: document.getElementById('searchCustomer')
+    searchCustomer: document.getElementById('searchCustomer'),
+    tableContainer: document.querySelector('.table-container')
 };
 
 // Utility Functions
@@ -93,11 +94,16 @@ const utils = {
     calculateCellWidth: () => {
         const containerWidth = document.querySelector('.container').clientWidth;
         const daysInMonth = utils.getDaysInMonth(state.currentYear, state.currentMonth);
-        const unitColumnWidth = 200; // Diperbesar untuk nama barang
-        const minCellWidth = 45; // Lebar minimal cell tanggal
+        const unitColumnWidth = 200;
+        const minCellWidth = 45;
         const availableWidth = containerWidth - unitColumnWidth - 40;
         
         return Math.max(minCellWidth, Math.floor(availableWidth / daysInMonth));
+    },
+    
+    isMobileDevice: () => {
+        return window.innerWidth <= 768 || 
+               /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     }
 };
 
@@ -109,9 +115,31 @@ const core = {
             if (!response.ok) throw new Error('Failed to load units.json');
             
             const data = await response.json();
-            if (!Array.isArray(data.units)) throw new Error('Invalid units format');
             
-            state.units = data.units;
+            // Handle duplicate names by adding index
+            const nameCount = {};
+            const processedUnits = [];
+            
+            data.units.forEach(unit => {
+                nameCount[unit.name] = (nameCount[unit.name] || 0) + 1;
+            });
+            
+            const nameIndex = {};
+            data.units.forEach(unit => {
+                let displayName = unit.name;
+                if (nameCount[unit.name] > 1) {
+                    nameIndex[unit.name] = (nameIndex[unit.name] || 0) + 1;
+                    displayName = `${unit.name} (${nameIndex[unit.name]})`;
+                }
+                
+                processedUnits.push({
+                    originalName: unit.name,
+                    displayName: displayName,
+                    category: unit.category
+                });
+            });
+            
+            state.units = processedUnits;
             state.categories = data.categories;
             return { units: state.units, categories: state.categories };
         } catch (error) {
@@ -191,16 +219,29 @@ const core = {
         elements.matrixBody.innerHTML = '';
         
         const selectedCategory = elements.filterCategory.value;
-        const filteredUnits = selectedCategory === 'Semua' 
-            ? state.units 
-            : state.units.filter(unit => unit.category === selectedCategory);
+        const selectedUnit = elements.filterUnit.value;
+        const selectedStatus = elements.filterStatus.value;
+        const searchTerm = elements.searchCustomer.value.toLowerCase();
+        
+        // Apply filters
+        let filteredUnits = state.units;
+        
+        // 1. Filter by category
+        if (selectedCategory !== 'Semua') {
+            filteredUnits = filteredUnits.filter(unit => unit.category === selectedCategory);
+        }
+        
+        // 2. Filter by unit (using originalName)
+        if (selectedUnit !== 'all') {
+            filteredUnits = filteredUnits.filter(unit => unit.originalName === selectedUnit);
+        }
         
         const cellWidth = utils.calculateCellWidth();
         
         filteredUnits.forEach(unit => {
             const row = document.createElement('tr');
             const unitCell = document.createElement('td');
-            unitCell.textContent = unit.name;
+            unitCell.textContent = unit.displayName; // Use displayName which includes index for duplicates
             unitCell.classList.add('unit-cell');
             row.appendChild(unitCell);
             
@@ -208,50 +249,70 @@ const core = {
             for (let day = 1; day <= daysInMonth; day++) {
                 const date = new Date(state.currentYear, state.currentMonth, day);
                 const dateStr = utils.formatDate(date);
-                const unitDateKey = `${unit.name}_${dateStr}`;
+                const unitDateKey = `${unit.originalName}_${dateStr}`;
                 
                 const cell = document.createElement('td');
                 cell.classList.add('date-cell');
                 if (utils.isWeekend(date)) cell.classList.add('weekend');
                 if (utils.isToday(date)) cell.classList.add('today');
                 
-                // Set lebar cell dinamis
                 cell.style.minWidth = `${cellWidth}px`;
-                
-                // Reset classes
                 cell.classList.remove('available', 'booked');
                 
                 // Process booking data
                 const booking = state.bookingData[unitDateKey];
-                const searchTerm = elements.searchCustomer.value.toLowerCase();
+                const customerName = booking?.customerName || '(Tanpa nama)';
                 
-                if (booking?.status === 'booked' && 
-                    (elements.filterStatus.value === 'all' || elements.filterStatus.value === 'booked')) {
-                    const customerName = booking.customerName || '(Tanpa nama)';
-                    
+                if (booking && (selectedStatus === 'all' || booking.status === selectedStatus)) {
                     if (!searchTerm || customerName.toLowerCase().includes(searchTerm)) {
-                        cell.classList.add('booked');
-                        cell.innerHTML = booking?.status === 'booked'
-                        ? `<div class="customer-name" title="${booking.customerName}">
-                        <small>${booking.customerName}</small>
-                        </div>`
-                        : '';
-
-                    } else {
-                        cell.classList.add('available');
+                        cell.classList.add(booking.status);
+                        if (booking.status === 'booked') {
+                            cell.innerHTML = `<div class="customer-name" title="${customerName}">
+                                <small>${customerName}</small>
+                            </div>`;
+                        }
                     }
-                } else if (!booking || 
-                          (booking.status === 'available' && 
-                           (elements.filterStatus.value === 'all' || elements.filterStatus.value === 'available'))) {
+                } else if (!booking && (selectedStatus === 'all' || selectedStatus === 'available')) {
                     cell.classList.add('available');
                 }
                 
-                cell.dataset.unit = unit.name;
+                cell.dataset.unit = unit.originalName;
                 cell.dataset.date = dateStr;
-                cell.addEventListener('click', () => core.openBookingModal(unit.name, dateStr));
+                cell.addEventListener('click', () => core.openBookingModal(unit.originalName, dateStr));
                 row.appendChild(cell);
             }
             elements.matrixBody.appendChild(row);
+        });
+    },
+
+    populateCategoryFilter: () => {
+        elements.filterCategory.innerHTML = '<option value="Semua">Semua</option>';
+        state.categories.forEach(category => {
+            const option = document.createElement('option');
+            option.value = category;
+            option.textContent = category;
+            elements.filterCategory.appendChild(option);
+        });
+    },
+
+    populateUnitFilter: () => {
+        const selectedCategory = elements.filterCategory.value;
+        elements.filterUnit.innerHTML = '<option value="all">Semua Barang</option>';
+        
+        // Get unique original names for the selected category
+        const uniqueNames = new Set();
+        const unitsToShow = selectedCategory === 'Semua' 
+            ? state.units 
+            : state.units.filter(unit => unit.category === selectedCategory);
+        
+        unitsToShow.forEach(unit => {
+            if (!uniqueNames.has(unit.originalName)) {
+                uniqueNames.add(unit.originalName);
+                const option = document.createElement('option');
+                option.value = unit.originalName;
+                option.textContent = unit.displayName; // Show display name with index if duplicate
+                elements.filterUnit.appendChild(option);
+            }
         });
     },
 
@@ -345,31 +406,6 @@ const core = {
         }
     },
 
-    populateCategoryFilter: () => {
-        elements.filterCategory.innerHTML = '<option value="Semua">Semua</option>';
-        state.categories.forEach(category => {
-            const option = document.createElement('option');
-            option.value = category;
-            option.textContent = category;
-            elements.filterCategory.appendChild(option);
-        });
-    },
-
-    populateUnitFilter: () => {
-        elements.filterUnit.innerHTML = '<option value="all">Semua Barang</option>';
-        const selectedCategory = elements.filterCategory.value;
-        const filteredUnits = selectedCategory === 'Semua' 
-            ? state.units 
-            : state.units.filter(unit => unit.category === selectedCategory);
-            
-        filteredUnits.forEach(unit => {
-            const option = document.createElement('option');
-            option.value = unit.name;
-            option.textContent = unit.name;
-            elements.filterUnit.appendChild(option);
-        });
-    },
-
     handleWindowResize: utils.debounce(() => {
         if (elements.matrixBody.children.length > 0) {
             core.generateMatrix();
@@ -450,69 +486,9 @@ const init = async () => {
     elements.saveBookingBtn.addEventListener('click', core.saveBooking);
     elements.cancelBookingBtn.addEventListener('click', () => state.bookingModal.hide());
     
-    
-    // Tambahkan event listener untuk resize window
     window.addEventListener('resize', core.handleWindowResize);
-    
-    // Set last updated time
     elements.lastUpdated.textContent = new Date().toLocaleString('id-ID');
 };
-
-// Fungsi untuk handle touch events
-function setupHorizontalScroll() {
-    const container = document.querySelector('.table-container');
-    let isDown = false;
-    let startX;
-    let scrollLeft;
-
-    container.addEventListener('mousedown', (e) => {
-        isDown = true;
-        startX = e.pageX - container.offsetLeft;
-        scrollLeft = container.scrollLeft;
-    });
-
-    container.addEventListener('mouseleave', () => {
-        isDown = false;
-    });
-
-    container.addEventListener('mouseup', () => {
-        isDown = false;
-    });
-
-    container.addEventListener('mousemove', (e) => {
-        if(!isDown) return;
-        e.preventDefault();
-        const x = e.pageX - container.offsetLeft;
-        const walk = (x - startX) * 2; // Scroll multiplier
-        container.scrollLeft = scrollLeft - walk;
-    });
-
-    // Untuk touch devices
-    container.addEventListener('touchstart', (e) => {
-        isDown = true;
-        startX = e.touches[0].pageX - container.offsetLeft;
-        scrollLeft = container.scrollLeft;
-    }, {passive: true});
-
-    container.addEventListener('touchend', () => {
-        isDown = false;
-    }, {passive: true});
-
-    container.addEventListener('touchmove', (e) => {
-        if(!isDown) return;
-        e.preventDefault();
-        const x = e.touches[0].pageX - container.offsetLeft;
-        const walk = (x - startX) * 2;
-        container.scrollLeft = scrollLeft - walk;
-    }, {passive: false});
-}
-
-// Panggil fungsi saat halaman dimuat
-document.addEventListener('DOMContentLoaded', function() {
-    if(window.innerWidth <= 768) {
-        setupHorizontalScroll();
-    }
-});
 
 // Start the application
 document.addEventListener('DOMContentLoaded', init);
