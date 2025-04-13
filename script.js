@@ -94,8 +94,8 @@ const utils = {
     calculateCellWidth: () => {
         const containerWidth = document.querySelector('.container').clientWidth;
         const daysInMonth = utils.getDaysInMonth(state.currentYear, state.currentMonth);
-        const unitColumnWidth = 200;
-        const minCellWidth = 45;
+        const unitColumnWidth = 180; // Sesuaikan dengan CSS
+        const minCellWidth = 40;
         const availableWidth = containerWidth - unitColumnWidth - 40;
         
         return Math.max(minCellWidth, Math.floor(availableWidth / daysInMonth));
@@ -194,6 +194,16 @@ const core = {
         const daysInMonth = utils.getDaysInMonth(state.currentYear, state.currentMonth);
         const cellWidth = utils.calculateCellWidth();
         
+        // Tambahkan kelas untuk menyesuaikan lebar berdasarkan jumlah hari
+        elements.tableContainer.classList.remove('days-28', 'days-30', 'days-31');
+        if (daysInMonth === 28) {
+            elements.tableContainer.classList.add('days-28');
+        } else if (daysInMonth === 30) {
+            elements.tableContainer.classList.add('days-30');
+        } else {
+            elements.tableContainer.classList.add('days-31');
+        }
+        
         for (let day = 1; day <= daysInMonth; day++) {
             const date = new Date(state.currentYear, state.currentMonth, day);
             const dateStr = utils.formatDate(date);
@@ -219,7 +229,7 @@ const core = {
         elements.matrixBody.innerHTML = '';
         
         const selectedCategory = elements.filterCategory.value;
-        const selectedUnit = elements.filterUnit.value;
+        const selectedUnitDisplayName = elements.filterUnit.selectedOptions[0]?.dataset.displayName;
         const selectedStatus = elements.filterStatus.value;
         const searchTerm = elements.searchCustomer.value.toLowerCase();
         
@@ -231,17 +241,20 @@ const core = {
             filteredUnits = filteredUnits.filter(unit => unit.category === selectedCategory);
         }
         
-        // 2. Filter by unit (using originalName)
-        if (selectedUnit !== 'all') {
-            filteredUnits = filteredUnits.filter(unit => unit.originalName === selectedUnit);
+        // 2. Filter by unit (using displayName)
+        if (selectedUnitDisplayName && selectedUnitDisplayName !== 'all') {
+            filteredUnits = filteredUnits.filter(unit => unit.displayName === selectedUnitDisplayName);
         }
+        
+        // 3. Sort units alphabetically by displayName
+        filteredUnits.sort((a, b) => a.displayName.localeCompare(b.displayName));
         
         const cellWidth = utils.calculateCellWidth();
         
         filteredUnits.forEach(unit => {
             const row = document.createElement('tr');
             const unitCell = document.createElement('td');
-            unitCell.textContent = unit.displayName; // Use displayName which includes index for duplicates
+            unitCell.textContent = unit.displayName;
             unitCell.classList.add('unit-cell');
             row.appendChild(unitCell);
             
@@ -297,22 +310,23 @@ const core = {
 
     populateUnitFilter: () => {
         const selectedCategory = elements.filterCategory.value;
-        elements.filterUnit.innerHTML = '<option value="all">Semua Barang</option>';
+        elements.filterUnit.innerHTML = '<option value="all" data-display-name="all">Semua Barang</option>';
         
-        // Get unique original names for the selected category
-        const uniqueNames = new Set();
+        // Filter unit berdasarkan kategori
         const unitsToShow = selectedCategory === 'Semua' 
             ? state.units 
             : state.units.filter(unit => unit.category === selectedCategory);
         
+        // Urutkan unit berdasarkan displayName untuk konsistensi
+        unitsToShow.sort((a, b) => a.displayName.localeCompare(b.displayName));
+        
+        // Tambahkan semua unit, termasuk duplikat, menggunakan displayName
         unitsToShow.forEach(unit => {
-            if (!uniqueNames.has(unit.originalName)) {
-                uniqueNames.add(unit.originalName);
-                const option = document.createElement('option');
-                option.value = unit.originalName;
-                option.textContent = unit.displayName; // Show display name with index if duplicate
-                elements.filterUnit.appendChild(option);
-            }
+            const option = document.createElement('option');
+            option.value = unit.originalName;
+            option.textContent = unit.displayName;
+            option.dataset.displayName = unit.displayName; // Simpan displayName untuk referensi
+            elements.filterUnit.appendChild(option);
         });
     },
 
@@ -336,6 +350,8 @@ const core = {
         }
         
         state.bookingModal.show();
+        // Fokus ke elemen pertama di dalam modal untuk aksesibilitas
+        elements.customerNameInput.focus();
     },
 
     saveBooking: async () => {
@@ -351,7 +367,15 @@ const core = {
         
         await core.saveBookingToServer(state.bookingData[unitDateKey]);
         state.bookingModal.hide();
+        // Pindahkan fokus ke elemen di luar modal
+        elements.refreshBtn.focus();
         core.generateMatrix();
+    },
+
+    cancelBooking: () => {
+        state.bookingModal.hide();
+        // Pindahkan fokus ke elemen di luar modal
+        elements.refreshBtn.focus();
     },
 
     saveBookingToServer: async (data) => {
@@ -484,7 +508,12 @@ const init = async () => {
     elements.filterUnit.addEventListener('change', core.generateMatrix);
     elements.searchCustomer.addEventListener('input', handlers.onSearch);
     elements.saveBookingBtn.addEventListener('click', core.saveBooking);
-    elements.cancelBookingBtn.addEventListener('click', () => state.bookingModal.hide());
+    elements.cancelBookingBtn.addEventListener('click', core.cancelBooking);
+    
+    // Tambahkan event listener untuk hidden.bs.modal untuk memastikan fokus setelah modal ditutup
+    elements.bookingModalElem.addEventListener('hidden.bs.modal', () => {
+        elements.refreshBtn.focus(); // Pindahkan fokus setelah modal benar-benar ditutup
+    });
     
     window.addEventListener('resize', core.handleWindowResize);
     elements.lastUpdated.textContent = new Date().toLocaleString('id-ID');
