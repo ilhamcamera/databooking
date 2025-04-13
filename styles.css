@@ -1,15 +1,15 @@
 :root {
-    --primary-color: #9F3133;     /* Merah maroon (utama) */
-    --secondary-color: #FFF5F5;   /* Putih susu (background) dari light-color */
-    --available-color: #FFF5F5;   /* Putih susu */
-    --booked-color: #D1A3A4;      /* Merah muda lembut (aksen) */
-    --weekend-color: #FFF5F5;     /* Putih susu */
-    --hover-color: #7A2527;       /* Merah tua */
-    --text-dark: #7A2527;         /* Merah tua untuk teks penting */
-    --text-light: #ffffff;        /* Putih untuk teks di atas background gelap */
-    --border-color: #D1A3A4;      /* Merah muda lembut untuk border */
-    --success-color: #9F3133;     /* Menggunakan warna utama untuk success */
-    --danger-color: #7A2527;      /* Menggunakan warna merah tua untuk danger */
+    --primary-color: #9F3133;
+    --secondary-color: #FFF5F5;
+    --available-color: #FFF5F5;
+    --booked-color: #D1A3A4;
+    --weekend-color: #D4AF37;
+    --hover-color: #7A2527;
+    --text-dark: #7A2527;
+    --text-light: #ffffff;
+    --border-color: #D1A3A4;
+    --success-color: #2E8B57;
+    --danger-color: #7A2527;
 }
 
 body {
