@@ -1,6 +1,6 @@
 // Konfigurasi Aplikasi
 const CONFIG = {
-    googleScriptUrl: 'https://script.google.com/macros/s/AKfycbwWIKTZnSBK2Rs2kNAhmth5E8yE_5wZoZ-RW5EjXvPLqcQhIl7HgIvn81u0xfJ-w19P/exec',
+    googleScriptUrl: 'https://script.google.com/macros/s/AKfycbx8Ys03XP2VU_Jc-hrkg2tqx6ARzXsV5LndosC4zLvVYq7FteoihxLKIVauYFSc-HAz/exec',
     unitsJsonPath: 'units.json',
     cacheKey: 'bookingAppCache'
 };
@@ -170,7 +170,7 @@ const core = {
                         date: value.date,
                         unit: value.unit,
                         customerName: value.customerName || '(Tanpa nama)',
-                        customerPhone: value.customerPhone || '',
+                        description: value.description || '',
                         status: value.status || 'available'
                     };
                 }
@@ -236,17 +236,14 @@ const core = {
         // Apply filters
         let filteredUnits = state.units;
         
-        // 1. Filter by category
         if (selectedCategory !== 'Semua') {
             filteredUnits = filteredUnits.filter(unit => unit.category === selectedCategory);
         }
         
-        // 2. Filter by unit (using displayName)
         if (selectedUnitDisplayName && selectedUnitDisplayName !== 'all') {
             filteredUnits = filteredUnits.filter(unit => unit.displayName === selectedUnitDisplayName);
         }
         
-        // 3. Sort units alphabetically by displayName
         filteredUnits.sort((a, b) => a.displayName.localeCompare(b.displayName));
         
         const cellWidth = utils.calculateCellWidth();
@@ -275,18 +272,29 @@ const core = {
                 // Process booking data
                 const booking = state.bookingData[unitDateKey];
                 const customerName = booking?.customerName || '(Tanpa nama)';
+                const description = booking?.description || '';
                 
                 if (booking && (selectedStatus === 'all' || booking.status === selectedStatus)) {
                     if (!searchTerm || customerName.toLowerCase().includes(searchTerm)) {
                         cell.classList.add(booking.status);
                         if (booking.status === 'booked') {
-                            cell.innerHTML = `<div class="customer-name" title="${customerName}">
-                                <small>${customerName}</small>
-                            </div>`;
+                            // Prioritaskan nama pelanggan untuk status booked
+                            let cellContent = `<div class="customer-name" title="${customerName}">${customerName}</div>`;
+                            if (description) {
+                                // Tambahkan keterangan di bawah nama pelanggan
+                                cellContent += `<div class="description" title="${description}"><small>${description}</small></div>`;
+                            }
+                            cell.innerHTML = cellContent;
+                        } else if (description) {
+                            // Untuk status available, hanya tampilkan keterangan jika ada
+                            cell.innerHTML = `<div class="description" title="${description}"><small>${description}</small></div>`;
                         }
                     }
                 } else if (!booking && (selectedStatus === 'all' || selectedStatus === 'available')) {
                     cell.classList.add('available');
+                    if (description) {
+                        cell.innerHTML = `<div class="description" title="${description}"><small>${description}</small></div>`;
+                    }
                 }
                 
                 cell.dataset.unit = unit.originalName;
@@ -312,20 +320,17 @@ const core = {
         const selectedCategory = elements.filterCategory.value;
         elements.filterUnit.innerHTML = '<option value="all" data-display-name="all">Semua Barang</option>';
         
-        // Filter unit berdasarkan kategori
         const unitsToShow = selectedCategory === 'Semua' 
             ? state.units 
             : state.units.filter(unit => unit.category === selectedCategory);
         
-        // Urutkan unit berdasarkan displayName untuk konsistensi
         unitsToShow.sort((a, b) => a.displayName.localeCompare(b.displayName));
         
-        // Tambahkan semua unit, termasuk duplikat, menggunakan displayName
         unitsToShow.forEach(unit => {
             const option = document.createElement('option');
             option.value = unit.originalName;
             option.textContent = unit.displayName;
-            option.dataset.displayName = unit.displayName; // Simpan displayName untuk referensi
+            option.dataset.displayName = unit.displayName;
             elements.filterUnit.appendChild(option);
         });
     },
@@ -341,7 +346,7 @@ const core = {
         
         if (booking) {
             elements.customerNameInput.value = booking.customerName || '';
-            elements.customerPhoneInput.value = booking.customerPhone || '';
+            elements.customerPhoneInput.value = booking.description || '';
             elements.bookingStatusSelect.value = booking.status || 'available';
         } else {
             elements.customerNameInput.value = '';
@@ -350,7 +355,6 @@ const core = {
         }
         
         state.bookingModal.show();
-        // Fokus ke elemen pertama di dalam modal untuk aksesibilitas
         elements.customerNameInput.focus();
     },
 
@@ -360,21 +364,19 @@ const core = {
         state.bookingData[unitDateKey] = {
             date: state.selectedDate,
             unit: state.selectedUnit,
-            customerName: elements.customerNameInput.value,
-            customerPhone: elements.customerPhoneInput.value,
+            customerName: elements.customerNameInput.value || '(Tanpa nama)',
+            description: elements.customerPhoneInput.value || '',
             status: elements.bookingStatusSelect.value
         };
         
         await core.saveBookingToServer(state.bookingData[unitDateKey]);
         state.bookingModal.hide();
-        // Pindahkan fokus ke elemen di luar modal
         elements.refreshBtn.focus();
         core.generateMatrix();
     },
 
     cancelBooking: () => {
         state.bookingModal.hide();
-        // Pindahkan fokus ke elemen di luar modal
         elements.refreshBtn.focus();
     },
 
@@ -384,9 +386,9 @@ const core = {
             params.append('action', 'saveBooking');
             params.append('date', data.date);
             params.append('unit', data.unit);
-            params.append('customerName', data.customerName);
-            params.append('customerPhone', data.customerPhone);
-            params.append('status', data.status);
+            params.append('customerName', data.customerName || '(Tanpa nama)');
+            params.append('description', data.description || '');
+            params.append('status', data.status || 'available');
             
             const response = await fetch(CONFIG.googleScriptUrl, {
                 method: 'POST',
@@ -408,14 +410,12 @@ const core = {
             
             if (!data.success) throw new Error(data.message || 'Gagal export');
             
-            // Convert to CSV
-            const headers = Object.keys(data.data[0]);
+            const headers = ['date', 'unit', 'customerName', 'description', 'status'];
             const csvRows = data.data.map(row => 
                 headers.map(field => `"${String(row[field] || '').replace(/"/g, '""')}"`).join(',')
             );
             const csvContent = [headers.join(','), ...csvRows].join('\n');
             
-            // Download CSV
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
@@ -479,15 +479,12 @@ const handlers = {
 
 // Initialize Application
 const init = async () => {
-    // Initialize modal
     state.bookingModal = new bootstrap.Modal(elements.bookingModalElem);
     
-    // Set current date
     const now = new Date();
     state.currentMonth = now.getMonth();
     state.currentYear = now.getFullYear();
     
-    // Load initial data
     try {
         elements.loadingIndicator.style.display = 'flex';
         await core.loadUnits();
@@ -498,7 +495,6 @@ const init = async () => {
         elements.loadingIndicator.style.display = 'none';
     }
     
-    // Set up event listeners
     elements.prevMonthBtn.addEventListener('click', handlers.onPrevMonth);
     elements.nextMonthBtn.addEventListener('click', handlers.onNextMonth);
     elements.refreshBtn.addEventListener('click', handlers.onRefresh);
@@ -510,14 +506,12 @@ const init = async () => {
     elements.saveBookingBtn.addEventListener('click', core.saveBooking);
     elements.cancelBookingBtn.addEventListener('click', core.cancelBooking);
     
-    // Tambahkan event listener untuk hidden.bs.modal untuk memastikan fokus setelah modal ditutup
     elements.bookingModalElem.addEventListener('hidden.bs.modal', () => {
-        elements.refreshBtn.focus(); // Pindahkan fokus setelah modal benar-benar ditutup
+        elements.refreshBtn.focus();
     });
     
     window.addEventListener('resize', core.handleWindowResize);
     elements.lastUpdated.textContent = new Date().toLocaleString('id-ID');
 };
 
-// Start the application
 document.addEventListener('DOMContentLoaded', init);
